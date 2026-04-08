@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 )
@@ -31,10 +32,10 @@ func printVersion() {
 	fmt.Fprintln(os.Stdout, "nougat", versionLine())
 }
 
-func printBuildInfo() {
+func printBuildInfo(w io.Writer, color bool) {
 	line := versionLine()
-	if supportsANSI() {
+	if color {
 		line = ansiGray + line + ansiReset
 	}
-	fmt.Fprintf(os.Stdout, "  %s\n", line)
+	fmt.Fprintf(w, "  %s\n", line)
 }

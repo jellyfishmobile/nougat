@@ -9,8 +9,8 @@ import (
 
 // printCLIHelp prints full usage with ANSI sections; suitable for -h / -help / `nougat help`.
 func printCLIHelp() {
-	printBanner()
-	printBuildInfo()
+	printBanner(os.Stdout)
+	printBuildInfo(os.Stdout, ansiOK(os.Stdout))
 	title := "Command help"
 	if supportsANSI() {
 		title = ansiBold + ansiWhite + title + ansiReset

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -69,6 +70,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	fmt.Fprintf(os.Stderr, "nougat: opening database %s …\n", dbPath)
+	_ = os.Stderr.Sync()
 	db, err := openDB(dbPath)
 	if err != nil {
 		log.Fatal(err)
@@ -88,8 +91,9 @@ func main() {
 	mux.HandleFunc("GET /dashboard/api/summary", srv.handleDashboardSummary)
 	mux.HandleFunc("GET /dashboard/api/history", srv.handleDashboardHistory)
 
-	printWelcome()
-	printServerStatus(db, addr, dbPath, logDir, configPath)
+	// Banner + status go to stderr so they show up when stdout is buffered or hidden (e.g. some IDEs).
+	printWelcome(os.Stderr)
+	printServerStatus(os.Stderr, db, addr, dbPath, logDir, configPath)
 	printServerRunningHint(addr)
 
 	handler := accessLogMiddleware(apiKeyMiddleware(cfg, mux), accessLogFile(logDir))
