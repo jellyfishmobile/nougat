@@ -41,6 +41,7 @@ func printBanner() {
 
 func printWelcome() {
 	printBanner()
+	printBuildInfo()
 	tagline := "Claude task runner · HTTP API"
 	if supportsANSI() {
 		tagline = ansiDim + "Claude task runner" + ansiReset + " · " + ansiGray + "HTTP API" + ansiReset
@@ -48,7 +49,7 @@ func printWelcome() {
 	fmt.Fprintf(os.Stdout, "  %s\n\n", tagline)
 }
 
-func printServerStatus(db *bolt.DB, addr, dbPath, logDir string) {
+func printServerStatus(db *bolt.DB, addr, dbPath, logDir, configPath string) {
 	title := "Status"
 	if supportsANSI() {
 		title = ansiBold + ansiWhite + "Status" + ansiReset
@@ -61,6 +62,9 @@ func printServerStatus(db *bolt.DB, addr, dbPath, logDir string) {
 	fmt.Fprintf(os.Stdout, "  %s Listen     %s\n", dimLabel("│"), addrDisp)
 	fmt.Fprintf(os.Stdout, "  %s Database   %s\n", dimLabel("│"), dbPath)
 	fmt.Fprintf(os.Stdout, "  %s Job logs   %s\n", dimLabel("│"), logDir)
+	if configPath != "" {
+		fmt.Fprintf(os.Stdout, "  %s Config     %s\n", dimLabel("│"), configPath)
+	}
 	acc := accessLogFile(logDir)
 	if acc != "" {
 		fmt.Fprintf(os.Stdout, "  %s Access log %s\n", dimLabel("│"), acc)
@@ -93,9 +97,12 @@ func printServerStatus(db *bolt.DB, addr, dbPath, logDir string) {
 		ep = ansiBold + ansiWhite + "Endpoints" + ansiReset
 	}
 	fmt.Fprintf(os.Stdout, "\n  %s\n", ep)
-	fmt.Fprintf(os.Stdout, "  %s POST  /run-task   accept task\n", dimLabel("│"))
-	fmt.Fprintf(os.Stdout, "  %s GET   /jobs/{id} job status & output\n", dimLabel("│"))
-	fmt.Fprintf(os.Stdout, "  %s GET   /health    liveness\n", dimLabel("│"))
+	fmt.Fprintf(os.Stdout, "  %s POST  /run-task           native async task\n", dimLabel("│"))
+	fmt.Fprintf(os.Stdout, "  %s GET   /jobs/{id}          job status & output\n", dimLabel("│"))
+	fmt.Fprintf(os.Stdout, "  %s POST  /v1/chat/completions OpenAI-compatible chat\n", dimLabel("│"))
+	fmt.Fprintf(os.Stdout, "  %s GET   /v1/models           OpenAI model list\n", dimLabel("│"))
+	fmt.Fprintf(os.Stdout, "  %s GET   /dashboard           usage UI (Bearer key)\n", dimLabel("│"))
+	fmt.Fprintf(os.Stdout, "  %s GET   /health              liveness\n", dimLabel("│"))
 
 	fmt.Fprintln(os.Stdout)
 	if supportsANSI() {
@@ -104,6 +111,30 @@ func printServerStatus(db *bolt.DB, addr, dbPath, logDir string) {
 		fmt.Fprintln(os.Stdout, "  Usage log (requests below)")
 		fmt.Fprintln(os.Stdout)
 	}
+	flushStdout()
+}
+
+// printServerRunningHint prints to stderr so it shows even when stdout is fully buffered (non-TTY).
+func printServerRunningHint(listenAddr string) {
+	base := listenAddrToBaseURL(listenAddr)
+	fmt.Fprintf(os.Stderr, "\nnougat: HTTP server is running on %s\n", listenAddr)
+	fmt.Fprintf(os.Stderr, "        Leave this process running; press Ctrl+C to stop.\n")
+	fmt.Fprintf(os.Stderr, "        Try: curl -s %s/health\n", base)
+}
+
+func listenAddrToBaseURL(listenAddr string) string {
+	a := strings.TrimSpace(listenAddr)
+	if a == "" {
+		return "http://127.0.0.1:8080"
+	}
+	if len(a) > 0 && a[0] == ':' {
+		return "http://127.0.0.1" + a
+	}
+	return "http://" + a
+}
+
+func flushStdout() {
+	_ = os.Stdout.Sync()
 }
 
 func dimLabel(s string) string {

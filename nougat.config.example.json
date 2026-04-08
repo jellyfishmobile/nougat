@@ -1,0 +1,13 @@
+{
+  "auth": {
+    "require_api_key": false
+  },
+  "api_keys": [
+    {
+      "id": "key_example",
+      "secret": "sk-nougat-REPLACE_ME_USE_gen-api-key",
+      "label": "example",
+      "created_at": "2026-04-08T00:00:00Z"
+    }
+  ]
+}

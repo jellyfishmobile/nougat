@@ -10,6 +10,7 @@ import (
 // printCLIHelp prints full usage with ANSI sections; suitable for -h / -help / `nougat help`.
 func printCLIHelp() {
 	printBanner()
+	printBuildInfo()
 	title := "Command help"
 	if supportsANSI() {
 		title = ansiBold + ansiWhite + title + ansiReset
@@ -29,11 +30,36 @@ for each job. Stdout/stderr and exit status are stored per job.
 	fmt.Fprintln(os.Stdout, notFlag(`  Environment: PORT may set the listen address (e.g. 8080 → ":8080") when -addr is omitted.`))
 
 	fmt.Fprintln(os.Stdout)
-	fmt.Fprintln(os.Stdout, helpSection("HTTP API"))
+	fmt.Fprintln(os.Stdout, helpSection("HTTP API (native)"))
 	fmt.Fprintln(os.Stdout, helpIndent(`
 POST /run-task       JSON body: {"prompt":"...","working_directory":"...","task_type":"...","timeout":300}
 GET  /jobs/{id}      Job status, stdout, stderr
 GET  /health         JSON {"status":"healthy"}
+`))
+
+	fmt.Fprintln(os.Stdout)
+	fmt.Fprintln(os.Stdout, helpSection("OpenAI-compatible API (/v1)"))
+	fmt.Fprintln(os.Stdout, helpIndent(`
+Use base URL `+helpExample("http://127.0.0.1:8080/v1")+` (no trailing slash) in Kilo Code, OpenCode, or any
+client that speaks the OpenAI Chat Completions protocol.
+
+POST /v1/chat/completions   Body: {"model":"gpt-4o","messages":[{"role":"user","content":"Hi"}]}
+                            Blocks until the LLM CLI finishes; `+helpCode("stream:true")+` returns SSE chunks.
+GET  /v1/models             Lists model ids (`+helpCode("NOUGAT_OPENAI_MODELS")+`; default `+helpCode("nougat-default")+`).
+
+GET /dashboard              HTML UI: paste API key for usage + history.
+GET /dashboard/api/summary   JSON totals (Bearer; key must be in config).
+GET /dashboard/api/history   JSON events (`+helpCode("?limit=100")+`).
+
+  `+helpCode("NOUGAT_CONFIG")+`             Config file path (default `+helpCode("./nougat.config.json")+`).
+  `+helpCode("-gen-api-key")+`                 Generate key, append to config, print secret, exit.
+  `+helpCode("-gen-key-label name")+`          Same as gen when set (you can omit `+helpCode("-gen-api-key")+`).
+  `+helpCode("NOUGAT_API_KEY")+`            Also registered as `+helpCode("key_env")+`.
+  Config `+helpCode("auth.require_api_key")+` forces Bearer on `+helpCode("/v1/*")+`.
+
+  `+helpCode("NOUGAT_OPENAI_WORKDIR")+`     Subprocess cwd (default `+helpCode(".")+`).
+  `+helpCode("NOUGAT_OPENAI_TIMEOUT_SEC")+` Timeout seconds (default `+helpCode("600")+`).
+
 `))
 
 	fmt.Fprintln(os.Stdout)

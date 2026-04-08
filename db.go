@@ -21,8 +21,16 @@ func openDB(path string) (*bolt.DB, error) {
 		return nil, fmt.Errorf("open bolt: %w", err)
 	}
 	err = db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte(jobsBucket))
-		return err
+		if _, err := tx.CreateBucketIfNotExists([]byte(jobsBucket)); err != nil {
+			return err
+		}
+		if _, err := tx.CreateBucketIfNotExists([]byte(bucketUsageTotals)); err != nil {
+			return err
+		}
+		if _, err := tx.CreateBucketIfNotExists([]byte(bucketUsageHistory)); err != nil {
+			return err
+		}
+		return nil
 	})
 	if err != nil {
 		_ = db.Close()

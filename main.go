@@ -23,6 +23,10 @@ type server struct {
 
 func main() {
 	addrFlag := flag.String("addr", "", `HTTP listen address (e.g. ":3000", "127.0.0.1:8080"). When set, overrides the PORT environment variable.`)
+	configPathFlag := flag.String("config", "", `path to nougat.config.json (API keys). Default: NOUGAT_CONFIG or ./nougat.config.json`)
+	genAPIKey := flag.Bool("gen-api-key", false, `generate sk-nougat-… key, append to config file, print secret, and exit`)
+	genKeyLabel := flag.String("gen-key-label", "", `label for the new key (implies -gen-api-key when non-empty)`)
+	showVersion := flag.Bool("version", false, `print version / build number / build time and exit`)
 	flag.Usage = printCLIHelp
 	if len(os.Args) > 1 && os.Args[1] == "help" {
 		printCLIHelp()
@@ -30,10 +34,34 @@ func main() {
 	}
 	flag.Parse()
 
+	if *showVersion {
+		printVersion()
+		os.Exit(0)
+	}
+
 	wd, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	configPath := strings.TrimSpace(*configPathFlag)
+	if configPath == "" {
+		configPath = defaultConfigPath(wd)
+	}
+	genKeyLabelTrim := strings.TrimSpace(*genKeyLabel)
+	doGenKey := *genAPIKey || genKeyLabelTrim != ""
+	if doGenKey {
+		if err := runGenAPIKey(configPath, genKeyLabelTrim); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
+	cfg, err := loadConfig(configPath)
+	if err != nil {
+		log.Fatalf("config: %v", err)
+	}
+	cfg.mergeEnvAPIKey()
 
 	dbPath := filepath.Join(wd, dbFile)
 	logDir := filepath.Join(wd, "logs")
@@ -54,11 +82,17 @@ func main() {
 	mux.HandleFunc("POST /run-task", srv.handleRunTask)
 	mux.HandleFunc("GET /jobs/{id}", srv.handleGetJob)
 	mux.HandleFunc("GET /health", handleHealth)
+	mux.HandleFunc("POST /v1/chat/completions", srv.handleOpenAIChatCompletions)
+	mux.HandleFunc("GET /v1/models", srv.handleOpenAIModels)
+	mux.HandleFunc("GET /dashboard", srv.handleDashboardPage)
+	mux.HandleFunc("GET /dashboard/api/summary", srv.handleDashboardSummary)
+	mux.HandleFunc("GET /dashboard/api/history", srv.handleDashboardHistory)
 
 	printWelcome()
-	printServerStatus(db, addr, dbPath, logDir)
+	printServerStatus(db, addr, dbPath, logDir, configPath)
+	printServerRunningHint(addr)
 
-	handler := accessLogMiddleware(mux, accessLogFile(logDir))
+	handler := accessLogMiddleware(apiKeyMiddleware(cfg, mux), accessLogFile(logDir))
 	log.Fatal(http.ListenAndServe(addr, handler))
 }
 
@@ -90,7 +124,12 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "healthy"})
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"status":        "healthy",
+		"version":       version,
+		"build_number":  buildNumber,
+		"build_time":    buildTime,
+	})
 }
 
 func (s *server) handleRunTask(w http.ResponseWriter, r *http.Request) {

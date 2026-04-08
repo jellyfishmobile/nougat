@@ -20,6 +20,7 @@ profile.cov
 .env
 .env.*
 !.env.example
+nougat.config.json
 
 # OS / editor
 .DS_Store
